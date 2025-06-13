@@ -2,29 +2,30 @@ import os
 import tempfile
 import streamlit as st
 import google.generativeai as genai
+import docx2txt
 
 from langchain.vectorstores import FAISS
 from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.chains import RetrievalQA
 from langchain.prompts import PromptTemplate
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain.document_loaders import PyPDFLoader
+from langchain.schema import Document
 
-from langchain.document_loaders import PyPDFLoader, UnstructuredWordDocumentLoader
-
-# ✅ Setup Gemini API key from secrets (Streamlit Cloud compatible)
+# ✅ Configure Gemini API Key securely from Streamlit Secrets
 genai.configure(api_key=st.secrets["AIzaSyARc-6LVuLXB1VEcwUed6cEdCK_8tf7s_0"])
 
-# Page setup
+# UI Setup
 st.set_page_config(page_title="📄 Ask Your Document", layout="centered")
 st.title("📄 Document Q&A with Gemini 2.0 Flash")
 st.caption("Upload a document and ask questions using Google Gemini and LangChain")
 
-# Load embedding model once
+# Embedding Model (cached)
 @st.cache_resource
 def load_embeddings():
     return HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
-# Load Gemini model once
+# Gemini LLM (cached)
 @st.cache_resource
 def load_llm():
     return ChatGoogleGenerativeAI(
@@ -33,7 +34,7 @@ def load_llm():
         convert_system_message_to_human=True,
     )
 
-# File uploader
+# Upload and process
 uploaded_file = st.file_uploader("📎 Upload a PDF, DOC or DOCX file", type=["pdf", "doc", "docx"])
 question = st.text_input("🔎 Ask a question from the document")
 
@@ -42,21 +43,21 @@ if uploaded_file:
         tmp.write(uploaded_file.getvalue())
         temp_path = tmp.name
 
-    # Load file using proper loader
     try:
         if uploaded_file.name.endswith(".pdf"):
             loader = PyPDFLoader(temp_path)
+            documents = loader.load()
         elif uploaded_file.name.endswith((".doc", ".docx")):
-            loader = UnstructuredWordDocumentLoader(temp_path)
+            text = docx2txt.process(temp_path)
+            documents = [Document(page_content=text)]
         else:
             st.error("Unsupported file format.")
             st.stop()
 
-        with st.spinner("📚 Reading document..."):
-            documents = loader.load()
-            st.success("✅ Document loaded")
+        with st.spinner("📚 Loading document..."):
+            st.success("✅ Document processed!")
 
-        # Vector store setup
+        # Vector DB
         embeddings = load_embeddings()
 
         @st.cache_resource
@@ -68,11 +69,11 @@ if uploaded_file:
 
         llm = load_llm()
 
-        # Prompt setup
+        # Custom prompt
         prompt = PromptTemplate(
             input_variables=["context", "question"],
             template="""
-Use the provided context to answer the question below.
+Use the following context to answer the question.
 Context:
 {context}
 
@@ -91,7 +92,7 @@ Answer:
         )
 
         if question:
-            with st.spinner("🔍 Generating answer..."):
+            with st.spinner("🤖 Generating answer..."):
                 answer = chain.run(question)
                 st.success("✅ Answer generated!")
                 st.markdown("### 📘 Answer:")

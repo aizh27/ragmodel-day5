@@ -4,10 +4,8 @@ import google.generativeai as genai
 import docx2txt
 from pypdf import PdfReader
 
-# ✅ Use either this (for deployment):
+# ✅ This line now works with correct secret setup
 genai.configure(api_key=st.secrets["AIzaSyDFmYSRE8QvhXpYL8Qj16_nHPvCB1Wlzrk"])
-# ❌ OR this (only for local testing):
-# genai.configure(api_key="AIzaSyARc-6LVuLXB1VEcwUed6cEdCK_8tf7s_0")
 
 st.set_page_config(page_title="📄 Gemini Doc Q&A", layout="centered")
 st.title("📄 Ask Questions from Your Document")

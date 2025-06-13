@@ -3,39 +3,20 @@ import tempfile
 import streamlit as st
 import google.generativeai as genai
 import docx2txt
-
-from langchain.vectorstores import FAISS
-from langchain.embeddings import HuggingFaceEmbeddings
-from langchain.chains import RetrievalQA
+from langchain.schema import Document
+from langchain.chains.question_answering import load_qa_chain
 from langchain.prompts import PromptTemplate
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.document_loaders import PyPDFLoader
-from langchain.schema import Document
 
-# ✅ Configure Gemini API Key securely from Streamlit Secrets
+# Configure Gemini API
 genai.configure(api_key=st.secrets["AIzaSyARc-6LVuLXB1VEcwUed6cEdCK_8tf7s_0"])
 
-# UI Setup
 st.set_page_config(page_title="📄 Ask Your Document", layout="centered")
-st.title("📄 Document Q&A with Gemini 2.0 Flash")
-st.caption("Upload a document and ask questions using Google Gemini and LangChain")
+st.title("📄 Gemini Document Q&A (No Embedding)")
+st.caption("Lightweight version without FAISS")
 
-# Embedding Model (cached)
-@st.cache_resource
-def load_embeddings():
-    return HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-
-# Gemini LLM (cached)
-@st.cache_resource
-def load_llm():
-    return ChatGoogleGenerativeAI(
-        model="gemini-2.0-flash",
-        temperature=0.2,
-        convert_system_message_to_human=True,
-    )
-
-# Upload and process
-uploaded_file = st.file_uploader("📎 Upload a PDF, DOC or DOCX file", type=["pdf", "doc", "docx"])
+uploaded_file = st.file_uploader("📎 Upload a PDF or Word Document", type=["pdf", "doc", "docx"])
 question = st.text_input("🔎 Ask a question from the document")
 
 if uploaded_file:
@@ -54,26 +35,18 @@ if uploaded_file:
             st.error("Unsupported file format.")
             st.stop()
 
-        with st.spinner("📚 Loading document..."):
-            st.success("✅ Document processed!")
+        st.success("✅ Document loaded!")
 
-        # Vector DB
-        embeddings = load_embeddings()
+        llm = ChatGoogleGenerativeAI(
+            model="gemini-2.0-flash",
+            temperature=0.2,
+            convert_system_message_to_human=True,
+        )
 
-        @st.cache_resource
-        def create_vectorstore(docs):
-            return FAISS.from_documents(docs, embeddings)
-
-        vectorstore = create_vectorstore(documents)
-        retriever = vectorstore.as_retriever()
-
-        llm = load_llm()
-
-        # Custom prompt
         prompt = PromptTemplate(
             input_variables=["context", "question"],
             template="""
-Use the following context to answer the question.
+You are an AI assistant. Use the following document context to answer the user's question.
 Context:
 {context}
 
@@ -84,19 +57,14 @@ Answer:
 """
         )
 
-        chain = RetrievalQA.from_chain_type(
-            llm=llm,
-            retriever=retriever,
-            chain_type="stuff",
-            chain_type_kwargs={"prompt": prompt}
-        )
+        chain = load_qa_chain(llm=llm, chain_type="stuff", prompt=prompt)
 
         if question:
-            with st.spinner("🤖 Generating answer..."):
-                answer = chain.run(question)
-                st.success("✅ Answer generated!")
+            with st.spinner("💬 Generating answer..."):
+                result = chain.run(input_documents=documents, question=question)
+                st.success("✅ Answer ready!")
                 st.markdown("### 📘 Answer:")
-                st.write(answer)
+                st.write(result)
 
     except Exception as e:
         st.error(f"🚨 Error: {str(e)}")

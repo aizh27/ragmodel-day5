@@ -5,7 +5,7 @@ import docx2txt
 from pypdf import PdfReader
 
 # Set Gemini API Key from secrets
-genai.configure(api_key=["AIzaSyARc-6LVuLXB1VEcwUed6cEdCK_8tf7s_0"])
+genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 
 st.set_page_config(page_title="📄 Gemini Doc Q&A", layout="centered")
 st.title("📄 Ask Questions from Your Document")

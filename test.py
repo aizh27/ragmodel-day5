@@ -9,7 +9,7 @@ from langchain.prompts import PromptTemplate
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 # ====== Set your Gemini API Key here ======
-GOOGLE_API_KEY = "YOUR_GOOGLE_API_KEY"
+GOOGLE_API_KEY = "AIzaSyBZVFzrY9P7nz4XZP7vHQTCmWpbPNbqkec"
 os.environ["GOOGLE_API_KEY"] = GOOGLE_API_KEY
 
 # ====== Streamlit UI ======
@@ -44,7 +44,7 @@ if uploaded_file:
 
     # Set up the Gemini model
     llm = ChatGoogleGenerativeAI(
-        model="gemini-1.5-flash",
+        model="gemini-2.0-flash-lite",
         temperature=0.3,
         convert_system_message_to_human=True,
     )

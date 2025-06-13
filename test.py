@@ -1,6 +1,7 @@
 import os
 import tempfile
 import streamlit as st
+import google.generativeai as genai
 from langchain.document_loaders import PyPDFLoader, UnstructuredWordDocumentLoader
 from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.vectorstores import FAISS
@@ -8,14 +9,14 @@ from langchain.chains import RetrievalQA
 from langchain.prompts import PromptTemplate
 from langchain_google_genai import ChatGoogleGenerativeAI
 
-# Set Gemini API Key
-os.environ["GOOGLE_API_KEY"] = "AIzaSyBZVFzrY9P7nz4XZP7vHQTCmWpbPNbqkec"
+# ✅ Configure Gemini API Key from st.secrets
+genai.configure(api_key=st.secrets["AIzaSyARc-6LVuLXB1VEcwUed6cEdCK_8tf7s_0"])
 
-st.set_page_config(page_title="📄 Ask Your Document | Gemini 2.0 Flash", layout="centered")
+st.set_page_config(page_title="📄 Ask Your Document | Gemini 2.0", layout="centered")
 st.title("📄 Ask Questions from Your Document")
 st.caption("Powered by Google Gemini 2.0 Flash + LangChain")
 
-# Cache embeddings
+# Cache embeddings to avoid reloading model
 @st.cache_resource
 def load_embeddings():
     return HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
@@ -37,30 +38,30 @@ if uploaded_file:
         tmp_file.write(uploaded_file.getvalue())
         file_path = tmp_file.name
 
-    # Load document
+    # Load the file using appropriate loader
     if uploaded_file.name.endswith(".pdf"):
         loader = PyPDFLoader(file_path)
     elif uploaded_file.name.endswith((".doc", ".docx")):
         loader = UnstructuredWordDocumentLoader(file_path)
     else:
-        st.error("Unsupported file type.")
+        st.error("❌ Unsupported file type.")
         st.stop()
 
-    docs = loader.load()
-    st.success("✅ Document loaded successfully!")
+    with st.spinner("📄 Reading document..."):
+        docs = loader.load()
+        st.success("✅ Document loaded successfully!")
 
     embeddings = load_embeddings()
 
     @st.cache_resource
-    def create_vectorstore(documents):
-        return FAISS.from_documents(documents, embeddings)
+    def create_vectorstore(docs):
+        return FAISS.from_documents(docs, embeddings)
 
     vectorstore = create_vectorstore(docs)
     retriever = vectorstore.as_retriever()
 
     llm = load_llm()
 
-    # Prompt Template
     prompt = PromptTemplate(
         input_variables=["context", "question"],
         template="""
@@ -71,10 +72,11 @@ Context:
 Question:
 {question}
 
-Answer:"""
+Answer:
+"""
     )
 
-    # Create Retrieval QA Chain
+    # RAG Chain
     qa_chain = RetrievalQA.from_chain_type(
         llm=llm,
         retriever=retriever,
@@ -83,8 +85,8 @@ Answer:"""
     )
 
     if question:
-        with st.spinner("🤖 Generating answer..."):
-            response = qa_chain.run(question)
+        with st.spinner("🤖 Finding answer..."):
+            result = qa_chain.run(question)
             st.success("✅ Answer generated!")
             st.markdown("### 📘 Answer:")
-            st.write(response)
+            st.write(result)

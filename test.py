@@ -1,33 +1,39 @@
-import tempfile
 import streamlit as st
+import tempfile
 import google.generativeai as genai
 import docx2txt
 from pypdf import PdfReader
-from langchain_google_genai import ChatGoogleGenerativeAI
 
-genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
+# Set Gemini API Key from Streamlit secrets
+genai.configure(api_key=st.secrets["AIzaSyARc-6LVuLXB1VEcwUed6cEdCK_8tf7s_0"])
 
-st.set_page_config(page_title="Document Q&A", layout="centered")
-st.title("📄 Gemini Document Q&A – Minimal")
+# Streamlit UI
+st.set_page_config(page_title="Gemini Q&A", layout="centered")
+st.title("📄 Ask Questions from Your Document")
+st.caption("Powered by Google Gemini 2.0 Flash")
 
-uploaded = st.file_uploader("Upload PDF or DOCX", type=["pdf", "doc", "docx"])
-question = st.text_input("Ask your question:")
+# Upload + Input
+uploaded_file = st.file_uploader("📎 Upload PDF or DOCX", type=["pdf", "docx"])
+question = st.text_input("💬 Enter your question:")
 
-if uploaded and question:
-    with tempfile.NamedTemporaryFile(delete=False, suffix=uploaded.name) as tmp:
-        tmp.write(uploaded.getvalue())
-        path = tmp.name
+# Process file & answer
+if uploaded_file and question:
+    with tempfile.NamedTemporaryFile(delete=False, suffix=uploaded_file.name) as tmp:
+        tmp.write(uploaded_file.getvalue())
+        temp_path = tmp.name
 
     try:
-        if uploaded.name.endswith(".pdf"):
-            reader = PdfReader(path)
-            text = "\n".join(page.extract_text() or "" for page in reader.pages)
+        # Read file content
+        if uploaded_file.name.endswith(".pdf"):
+            reader = PdfReader(temp_path)
+            text = "\n".join([page.extract_text() or "" for page in reader.pages])
         else:
-            text = docx2txt.process(path)
+            text = docx2txt.process(temp_path)
 
-        st.success("📄 Document loaded!")
+        st.success("✅ Document processed!")
 
-        llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0.2)
+        # Gemini model call
+        model = genai.GenerativeModel("gemini-2.0-flash")
         prompt = f"""
 Document:
 {text}
@@ -35,12 +41,12 @@ Document:
 Question:
 {question}
 
-Answer:"""
-
-        with st.spinner("Generating answer..."):
-            answer = llm(prompt)
-            st.success("✅ Here’s the answer:")
-            st.write(answer["content"])
+Answer:
+"""
+        with st.spinner("🤖 Generating answer..."):
+            response = model.generate_content(prompt)
+            st.success("✅ Answer:")
+            st.write(response.text)
 
     except Exception as e:
-        st.error(f"Error: {e}")
+        st.error(f"🚨 Error: {e}")
